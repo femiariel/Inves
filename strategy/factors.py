@@ -300,9 +300,9 @@ def _invalid_score_fields() -> dict:
         "trend_z": 0.0,
         "vol_z": 0.0,
         "drawdown_z": 0.0,
-        "factor_score": -math.inf,
+        "factor_score": 0.0,
         "score": BAD_DATA_SCORE,
-        "raw_score": -math.inf,
+        "raw_score": 0.0,
         "trend_component": 0.0,
         "risk_penalty": 100.0,
     }

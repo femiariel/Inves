@@ -29,12 +29,18 @@ def load_histories(settings: dict | None = None) -> dict:
 
 
 def compute_signals(settings: dict) -> list[dict]:
-    """Load histories, compute signals, replace NaN with None for JSON."""
+    """Load histories, compute signals, replace non-finite floats for JSON."""
     histories = load_histories(settings)
     meta_list = get_etf_metadata()
     meta      = pd.DataFrame(meta_list).set_index("ticker")
     raw       = build_all_signals(histories, meta)
+
+    def json_value(v):
+        if isinstance(v, float) and not math.isfinite(v):
+            return None
+        return v
+
     return [
-        {k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in s.items()}
+        {k: json_value(v) for k, v in s.items()}
         for s in raw
     ]
