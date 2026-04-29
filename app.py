@@ -12,7 +12,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from data.market_data import DataSource, fetch_all, invalidate_cache
+import api.db as price_db
 from data.pea_universe import CORE_ANCHOR, get_etf_metadata, get_all_tickers
 from portfolio.optimizer import build_proposal, build_rebalance_orders, run_backtest
 from portfolio.store import (
@@ -133,6 +133,16 @@ def _save():
     save(st.session_state.doc)
 
 
+def _load_cached_histories() -> dict:
+    price_db.init_db()
+    histories = {}
+    for ticker in get_all_tickers():
+        df = price_db.load_prices(ticker)
+        if df is not None and len(df) >= 20:
+            histories[ticker] = df
+    return histories
+
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown(f"## 📡 PEA Radar")
@@ -156,58 +166,42 @@ with st.sidebar:
 
     st.markdown("---")
 
-    source_options = [e.value for e in DataSource]
-    source_label = st.selectbox("Source de données", source_options,
-                                index=source_options.index(cfg["data_source"])
-                                if cfg["data_source"] in source_options else 1)
-    data_source = DataSource(source_label)
-
-    api_key_input = ""
-    if data_source == DataSource.EODHD:
-        api_key_input = st.text_input("Clé API EODHD", value=cfg.get("eodhd_api_key", ""), type="password")
-
-    years_input = st.selectbox("Historique", [1, 2, 3, 5], index=1, format_func=lambda y: f"{y} an{'s' if y>1 else ''}")
+    db_settings = price_db.get_settings()
+    source_label = db_settings.get("data_source", cfg.get("data_source", "cache"))
+    years_input = int(db_settings.get("history_years", cfg.get("history_years", 2)))
+    st.caption(f"Données en cache SQLite : {source_label} • {years_input} ans")
 
     st.markdown("---")
 
-    if st.button("🔄 Charger les données", type="primary", use_container_width=True):
-        invalidate_cache()
-        with st.spinner("Téléchargement des prix…"):
-            tickers = get_all_tickers()
-            histories = fetch_all(
-                tickers,
-                source=data_source,
-                api_key=api_key_input,
-                years=years_input,
-                use_cache=False,
-            )
+    if st.button("🔄 Lire le cache", type="primary", use_container_width=True):
+        with st.spinner("Lecture des prix en cache…"):
+            histories = _load_cached_histories()
             st.session_state.histories = histories
             meta_df = get_etf_metadata()
             st.session_state.signals = build_all_signals(histories, meta_df)
             st.session_state.data_loaded = True
             ok = len(histories)
-            st.session_state.data_badge = f"✅ {ok} ETF chargés — {source_label}"
+            st.session_state.data_badge = f"✅ {ok} ETF chargés depuis SQLite — {source_label}"
         st.rerun()
 
     if st.session_state.data_badge:
         st.caption(st.session_state.data_badge)
 
-    # Auto-load on first run with mock
+    # Auto-load on first run from SQLite cache.
     if not st.session_state.data_loaded:
-        with st.spinner("Chargement démo…"):
-            tickers = get_all_tickers()
-            histories = fetch_all(tickers, source=DataSource.MOCK, years=years_input, use_cache=True)
+        with st.spinner("Lecture du cache…"):
+            histories = _load_cached_histories()
             st.session_state.histories = histories
             meta_df = get_etf_metadata()
             st.session_state.signals = build_all_signals(histories, meta_df)
             st.session_state.data_loaded = True
-            st.session_state.data_badge = f"⚡ Mode démo — {len(histories)} ETF"
+            st.session_state.data_badge = f"⚡ Cache SQLite — {len(histories)} ETF"
 
     # Persist settings on change
     new_settings = {
         "broker_name":   cfg["broker_name"],
         "data_source":   source_label,
-        "eodhd_api_key": api_key_input or cfg.get("eodhd_api_key", ""),
+        "eodhd_api_key": cfg.get("eodhd_api_key", ""),
         "capital":       capital_input,
         "top_n":         top_n_input,
         "currency":      cfg["currency"],
@@ -724,11 +718,11 @@ with tab_settings:
 
         st.markdown("---")
         st.markdown("**Source de données**")
-        src_opts = [e.value for e in DataSource]
-        src_idx  = src_opts.index(cfg["data_source"]) if cfg["data_source"] in src_opts else 1
-        src_sel  = st.selectbox("Source", src_opts, index=src_idx)
-        api_key  = st.text_input("Clé EODHD", value=cfg.get("eodhd_api_key", ""), type="password",
-                                  help="Obtenir sur eodhd.com — requis uniquement si source = EODHD")
+        db_settings = price_db.get_settings()
+        st.caption(
+            f"Cache SQLite : {db_settings.get('data_source', 'cache')} • "
+            f"{db_settings.get('history_years', '—')} ans"
+        )
 
         saved = st.form_submit_button("💾 Enregistrer", type="primary")
         if saved:
@@ -737,8 +731,8 @@ with tab_settings:
                 "broker_name":   broker,
                 "currency":      currency,
                 "capital":       init_cap,
-                "data_source":   src_sel,
-                "eodhd_api_key": api_key,
+                "data_source":   db_settings.get("data_source", cfg.get("data_source", "cache")),
+                "eodhd_api_key": cfg.get("eodhd_api_key", ""),
             }
             _save()
             st.success("Réglages sauvegardés.")
@@ -753,8 +747,3 @@ with tab_settings:
     disp.columns = ["Nom", "Sleeve", "Catégorie", "Poids cible", "Notes"]
     disp["Poids cible"] = disp["Poids cible"].map("{:.0%}".format)
     st.dataframe(disp, use_container_width=True)
-
-    st.markdown("---")
-    if st.button("⚠️ Vider le cache des prix", type="secondary"):
-        invalidate_cache()
-        st.success("Cache supprimé — rechargez les données.")

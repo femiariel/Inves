@@ -1,17 +1,17 @@
 """
 Market data fetching: EODHD (primary) → Yahoo Finance (fallback) → Mock (offline).
 Returns per-ticker DataFrames with a DatetimeIndex and a 'close' column.
+
+Yahoo fetches all tickers in one batch call to avoid per-ticker rate limiting.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import time
 from datetime import date, timedelta
 from enum import Enum
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -19,14 +19,18 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-CACHE_DIR = Path(__file__).parent / "price_cache"
-CACHE_TTL_HOURS = 12
-
 
 class DataSource(str, Enum):
     EODHD = "EODHD"
     YAHOO = "Yahoo Finance"
     MOCK  = "Hors-ligne (démo)"
+
+
+YAHOO_CHUNK = 100  # tickers per batch request
+
+SOURCE_MOCK = "mock"
+SOURCE_YAHOO = "yahoo"
+SOURCE_EODHD = "eodhd"
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -36,65 +40,131 @@ def fetch_all(
     source: DataSource,
     api_key: str = "",
     years: int = 2,
-    use_cache: bool = True,
 ) -> dict[str, pd.DataFrame]:
     """
     Fetch historical close prices for every ticker.
     Returns {ticker: DataFrame(index=date, columns=['close'])}.
     Silently drops tickers that fail to load.
     """
+    return {ticker: df for ticker, (df, _) in fetch_all_with_sources(tickers, source, api_key, years).items()}
+
+
+def fetch_all_with_sources(
+    tickers: list[str],
+    source: DataSource,
+    api_key: str = "",
+    years: int = 2,
+) -> dict[str, tuple[pd.DataFrame, str]]:
+    """
+    Fetch historical close prices and keep the actual source used per ticker.
+    Returns {ticker: (DataFrame(index=date, columns=['close']), source_key)}.
+    """
+    if source == DataSource.MOCK:
+        return {t: (_mock(t, years * 252), SOURCE_MOCK) for t in tickers}
+
+    if source == DataSource.EODHD:
+        return _fetch_all_eodhd_with_sources(tickers, api_key, years)
+
+    # Yahoo (default)
+    return {
+        ticker: (df, SOURCE_YAHOO)
+        for ticker, df in _fetch_all_yahoo(tickers, years).items()
+    }
+
+
+def invalidate_cache(*_: object) -> None:
+    pass  # cache now handled by SQLite in api/db.py
+
+
+# ── Yahoo batch ───────────────────────────────────────────────────────────────
+
+def _fetch_all_yahoo(tickers: list[str], years: int) -> dict[str, pd.DataFrame]:
+    period_map = {1: "1y", 2: "2y", 3: "3y", 5: "5y"}
+    period = period_map.get(years, "2y")
     results: dict[str, pd.DataFrame] = {}
-    for ticker in tickers:
+
+    for i in range(0, len(tickers), YAHOO_CHUNK):
+        chunk = tickers[i : i + YAHOO_CHUNK]
         try:
-            df = _fetch_one(ticker, source, api_key, years, use_cache)
-            if df is not None and len(df) >= 20:
-                results[ticker] = df
+            raw = yf.download(chunk, period=period, auto_adjust=True, progress=False, threads=True)
+            if raw.empty:
+                continue
+
+            if isinstance(raw.columns, pd.MultiIndex):
+                # Multiple tickers → MultiIndex columns (field, ticker)
+                close_key = "Close" if "Close" in raw.columns.get_level_values(0) else "Adj Close"
+                close = raw[close_key]
+                for t in chunk:
+                    if t in close.columns:
+                        s = close[t].dropna()
+                        if len(s) >= 20:
+                            df = s.to_frame("close")
+                            df.index = pd.to_datetime(df.index).tz_localize(None)
+                            results[t] = df
+            else:
+                # Single ticker in chunk
+                t = chunk[0]
+                col = "Close" if "Close" in raw.columns else "Adj Close"
+                s = raw[col].dropna()
+                if len(s) >= 20:
+                    df = s.to_frame("close")
+                    df.index = pd.to_datetime(df.index).tz_localize(None)
+                    results[t] = df
+
         except Exception:
             pass
+
+        if i + YAHOO_CHUNK < len(tickers):
+            time.sleep(1)  # be gentle between chunks
+
     return results
 
 
-def invalidate_cache(ticker: Optional[str] = None) -> None:
-    if not CACHE_DIR.exists():
-        return
-    if ticker:
-        p = CACHE_DIR / f"{ticker.replace('.', '_')}.json"
-        if p.exists():
-            p.unlink()
-    else:
-        for p in CACHE_DIR.glob("*.json"):
-            p.unlink()
+# ── EODHD individual + Yahoo fallback ─────────────────────────────────────────
+
+def _fetch_all_eodhd(tickers: list[str], api_key: str, years: int) -> dict[str, pd.DataFrame]:
+    return {ticker: df for ticker, (df, _) in _fetch_all_eodhd_with_sources(tickers, api_key, years).items()}
 
 
-# ── Internal ──────────────────────────────────────────────────────────────────
-
-def _fetch_one(
-    ticker: str,
-    source: DataSource,
+def _fetch_all_eodhd_with_sources(
+    tickers: list[str],
     api_key: str,
     years: int,
-    use_cache: bool,
-) -> Optional[pd.DataFrame]:
-    if use_cache:
-        cached = _load_cache(ticker)
-        if cached is not None:
-            return cached
+) -> dict[str, tuple[pd.DataFrame, str]]:
+    if not api_key or api_key == "demo":
+        return {
+            ticker: (df, SOURCE_YAHOO)
+            for ticker, df in _fetch_all_yahoo(tickers, years).items()
+        }
 
-    if source == DataSource.MOCK:
-        df = _mock(ticker, years * 252)
-    elif source == DataSource.EODHD:
-        df = _eodhd(ticker, api_key, years) or _yahoo(ticker, years) or _mock(ticker, years * 252)
-    else:
-        df = _yahoo(ticker, years) or _mock(ticker, years * 252)
+    results: dict[str, tuple[pd.DataFrame, str]] = {}
+    quota_exceeded = False
 
-    if df is not None and use_cache:
-        _save_cache(ticker, df)
-    return df
+    for ticker in tickers:
+        if quota_exceeded:
+            break
+
+        df, exceeded = _eodhd_one(ticker, api_key, years)
+        if exceeded:
+            quota_exceeded = True
+            break
+        if df is not None:
+            results[ticker] = (df, SOURCE_EODHD)
+
+    # Remaining tickers (quota hit or not fetched) → Yahoo batch
+    remaining = [t for t in tickers if t not in results]
+    if remaining:
+        yahoo_results = _fetch_all_yahoo(remaining, years)
+        results.update({
+            ticker: (df, SOURCE_YAHOO)
+            for ticker, df in yahoo_results.items()
+        })
+
+    return results
 
 
-def _eodhd(ticker: str, api_key: str, years: int) -> Optional[pd.DataFrame]:
-    if not api_key:
-        return None
+def _eodhd_one(ticker: str, api_key: str, years: int) -> tuple[Optional[pd.DataFrame], bool]:
+    """Returns (df_or_None, quota_exceeded)."""
     from_date = (date.today() - timedelta(days=years * 365 + 30)).isoformat()
     url = (
         f"https://eodhd.com/api/eod/{ticker}"
@@ -102,37 +172,24 @@ def _eodhd(ticker: str, api_key: str, years: int) -> Optional[pd.DataFrame]:
     )
     try:
         resp = requests.get(url, timeout=15)
+        if resp.status_code == 402:
+            return None, True  # quota exceeded → switch to Yahoo
         if resp.status_code != 200:
-            return None
+            return None, False
         data = resp.json()
         if not data or not isinstance(data, list):
-            return None
+            return None, False
         df = pd.DataFrame(data)
         df["date"] = pd.to_datetime(df["date"])
         df = df.set_index("date").sort_index()
         price_col = "adjusted_close" if "adjusted_close" in df.columns else "close"
         df = df[[price_col]].rename(columns={price_col: "close"})
-        return df.dropna()
+        return df.dropna(), False
     except Exception:
-        return None
+        return None, False
 
 
-def _yahoo(ticker: str, years: int) -> Optional[pd.DataFrame]:
-    period_map = {1: "1y", 2: "2y", 3: "3y", 5: "5y"}
-    period = period_map.get(years, "2y")
-    try:
-        raw = yf.download(ticker, period=period, auto_adjust=True, progress=False, threads=False)
-        if raw.empty:
-            return None
-        if isinstance(raw.columns, pd.MultiIndex):
-            df = raw["Close"].to_frame("close")
-        else:
-            df = raw[["Close"]].rename(columns={"Close": "close"})
-        df.index = pd.to_datetime(df.index).tz_localize(None)
-        return df.dropna()
-    except Exception:
-        return None
-
+# ── Mock ──────────────────────────────────────────────────────────────────────
 
 def _mock(ticker: str, n_days: int = 504) -> pd.DataFrame:
     seed = int(hashlib.md5(ticker.encode()).hexdigest()[:8], 16) % (2**31)
@@ -150,36 +207,3 @@ def _mock(ticker: str, n_days: int = 504) -> pd.DataFrame:
         freq="B",
     )
     return pd.DataFrame({"close": prices}, index=dates)
-
-
-# ── Cache helpers ─────────────────────────────────────────────────────────────
-
-def _cache_path(ticker: str) -> Path:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    return CACHE_DIR / f"{ticker.replace('.', '_')}.json"
-
-
-def _load_cache(ticker: str) -> Optional[pd.DataFrame]:
-    p = _cache_path(ticker)
-    if not p.exists():
-        return None
-    try:
-        payload = json.loads(p.read_text())
-        age_h = (time.time() - payload["ts"]) / 3600
-        if age_h > CACHE_TTL_HOURS:
-            return None
-        df = pd.DataFrame(payload["data"])
-        df.index = pd.to_datetime(df.index)
-        df.index.name = "date"
-        return df
-    except Exception:
-        return None
-
-
-def _save_cache(ticker: str, df: pd.DataFrame) -> None:
-    p = _cache_path(ticker)
-    payload = {
-        "ts": time.time(),
-        "data": df.to_dict(orient="dict"),
-    }
-    p.write_text(json.dumps(payload))
