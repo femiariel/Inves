@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import math
 
+import pandas as pd
 import api.db as db
 from data.market_data import DataSource, fetch_all
 from data.pea_universe import get_all_tickers, get_etf_metadata
@@ -53,7 +54,8 @@ def load_histories(settings: dict) -> dict:
 def compute_signals(settings: dict) -> list[dict]:
     """Load histories, compute signals, replace NaN with None for JSON."""
     histories = load_histories(settings)
-    meta      = get_etf_metadata()
+    meta_list = get_etf_metadata()
+    meta      = pd.DataFrame(meta_list).set_index("ticker")
     raw       = build_all_signals(histories, meta)
     return [
         {k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in s.items()}

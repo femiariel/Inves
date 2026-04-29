@@ -109,7 +109,7 @@ export default function SettingsPage() {
           Paramètres stratégie
         </h2>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs text-graphite-muted mb-1.5">Capital (€)</label>
             <input

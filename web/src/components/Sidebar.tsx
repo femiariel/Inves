@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { TrendingUp, BarChart2, Wallet, Settings } from 'lucide-react'
+import { TrendingUp, BarChart2, Wallet, Settings, X } from 'lucide-react'
 
 const links = [
   { to: '/',          icon: TrendingUp, label: 'Stratégie'    },
@@ -8,18 +8,34 @@ const links = [
   { to: '/settings',  icon: Settings,   label: 'Réglages'     },
 ]
 
-export function Sidebar() {
+interface Props {
+  open:    boolean
+  onClose: () => void
+}
+
+export function Sidebar({ open, onClose }: Props) {
   return (
-    <aside className="fixed inset-y-0 left-0 w-56 bg-graphite flex flex-col z-10">
+    <aside className={`
+      fixed inset-y-0 left-0 w-56 bg-graphite flex flex-col z-30
+      transition-transform duration-200
+      ${open ? 'translate-x-0' : '-translate-x-full'}
+      md:translate-x-0
+    `}>
+      {/* Close button — mobile only */}
+      <button
+        className="md:hidden absolute top-4 right-4 text-white/50 hover:text-white"
+        onClick={onClose}
+      >
+        <X size={18} />
+      </button>
+
       {/* Logo */}
       <div className="px-6 pt-8 pb-6 border-b border-white/5">
         <div className="text-xs font-semibold tracking-[0.2em] text-graphite-subtle uppercase mb-1">
           Alloc
         </div>
-        <div className="text-white text-lg font-semibold leading-tight">
-          PEA Radar
-        </div>
-        <div className="text-graphite-subtle text-xs mt-1">111 ETF · Euronext Paris</div>
+        <div className="text-white text-lg font-semibold">PEA Radar</div>
+        <div className="text-graphite-subtle text-xs mt-1">Euronext Paris · 80/20</div>
       </div>
 
       {/* Nav */}
@@ -29,6 +45,7 @@ export function Sidebar() {
             key={to}
             to={to}
             end={to === '/'}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
@@ -44,7 +61,7 @@ export function Sidebar() {
       </nav>
 
       <div className="px-6 py-5 text-graphite-muted text-[11px]">
-        Stratégie 80/20 · momentum
+        Stratégie momentum · factor investing
       </div>
     </aside>
   )

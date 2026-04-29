@@ -90,7 +90,7 @@ export default function Strategy() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <KpiCard
           label="Capital"
           value={`${fmt(proposal.capital, 0)} €`}
@@ -213,7 +213,7 @@ export default function Strategy() {
 
         {backtest ? (
           <>
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <div>
                 <div className="text-[11px] text-graphite-subtle uppercase tracking-wider">CAGR stratégie</div>
                 <div className="text-lg font-semibold text-forest mt-1">{pct(backtest.cagr)}</div>

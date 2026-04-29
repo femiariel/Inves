@@ -88,7 +88,7 @@ export default function Portfolio() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
         <KpiCard
           label="Valeur marché"
           value={`${fmt(totalMV, 0)} €`}
@@ -116,7 +116,7 @@ export default function Portfolio() {
               <X size={16} />
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-graphite-muted mb-1">Ticker</label>
               {editing ? (
