@@ -17,6 +17,13 @@ export interface Signal {
   above_sma200: boolean
   annual_vol: number
   max_drawdown: number
+  data_quality_ok: boolean
+  allocation_eligible: boolean
+  factor_score: number
+  momentum_z: number
+  trend_z: number
+  vol_z: number
+  drawdown_z: number
   recommendation: Rec
   rec_label: string
   rec_color: string

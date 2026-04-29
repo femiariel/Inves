@@ -238,9 +238,9 @@ def _rec_pill(rec: str) -> str:
     return _pill(label, kind)
 
 def _score_color(score: float) -> str:
-    if score >= 12: return C["green"]
-    if score >= 3:  return C["green2"]
-    if score >= -8: return C["amber"]
+    if score >= 70: return C["green"]
+    if score >= 55: return C["green2"]
+    if score >= 40: return C["amber"]
     return C["red"]
 
 
