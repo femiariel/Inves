@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/api/client.ts","./src/components/kpicard.tsx","./src/components/scorebadge.tsx","./src/components/sidebar.tsx","./src/components/spinner.tsx","./src/hooks/useapi.ts","./src/pages/portfolio.tsx","./src/pages/settings.tsx","./src/pages/signals.tsx","./src/pages/strategy.tsx"],"version":"5.9.3"}

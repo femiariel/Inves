@@ -21,8 +21,8 @@ interface FormState {
 const emptyForm: FormState = { ticker: '', quantity: '', avg_cost: '' }
 
 export default function Portfolio() {
-  const { data: holdings, loading, error, refetch } = useApi(() => api.holdings())
-  const { data: universe } = useApi(() => api.universe())
+  const { data: holdings, loading, error, refetch } = useApi<Holding[]>(() => api.holdings.list())
+  const { data: universe } = useApi<ETFMeta[]>(() => api.universe())
 
   const [form, setForm]       = useState<FormState>(emptyForm)
   const [editing, setEditing] = useState<string | null>(null)

@@ -1,7 +1,4 @@
-{$DOMAIN} {
-    # API → FastAPI
+:80 {
     reverse_proxy /api/* api:8000
-
-    # Tout le reste → React (SPA)
     reverse_proxy /* web:80
 }
