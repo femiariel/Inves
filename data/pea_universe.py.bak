@@ -1,0 +1,435 @@
+"""
+PEA-eligible ETF universe — Euronext Paris.
+Tickers vérifiés sur Euronext / Yahoo Finance / justETF.
+Sources : Amundi, Lyxor (fusionné Amundi), iShares/BNP swap,
+          BNP Paribas Easy, SPDR, Xtrackers (DWS), Vanguard.
+"""
+
+from __future__ import annotations
+import pandas as pd
+
+SLEEVE_CORE       = "core"
+SLEEVE_AGGRESSIVE = "aggressive"
+SLEEVE_DEFENSIVE  = "defensive"
+
+CAT_WORLD    = "Monde"
+CAT_US       = "États-Unis"
+CAT_NASDAQ   = "Tech / Nasdaq"
+CAT_EUROPE   = "Europe"
+CAT_FRANCE   = "France"
+CAT_GERMANY  = "Allemagne"
+CAT_UK       = "Royaume-Uni"
+CAT_JAPAN    = "Japon"
+CAT_EM       = "Émergents"
+CAT_SMALL    = "Small Cap"
+CAT_SECTOR   = "Sectoriel"
+CAT_ESG      = "ESG / SRI"
+CAT_FACTOR   = "Facteur"
+CAT_DIVIDEND = "Dividendes"
+CAT_MONEY    = "Monétaire"
+
+PEA_UNIVERSE: dict[str, dict] = {
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # MONDE / GLOBAL
+    # ══════════════════════════════════════════════════════════════════════════
+    "DCAM.PA": {
+        "name": "Amundi PEA Monde MSCI World",
+        "sleeve": SLEEVE_CORE, "category": CAT_WORLD, "target_weight": 0.30,
+        "notes": "Ancre principale — synthétique swap PEA éligible",
+    },
+    "CW8.PA": {
+        "name": "Amundi MSCI World EUR Acc",
+        "sleeve": SLEEVE_CORE, "category": CAT_WORLD, "target_weight": 0.10,
+        "notes": "MSCI World swap — très liquide, TER 0.38%",
+    },
+    "WPEA.PA": {
+        "name": "Amundi MSCI World Acc PEA",
+        "sleeve": SLEEVE_CORE, "category": CAT_WORLD, "target_weight": 0.08,
+        "notes": "Variante monde accumulation PEA",
+    },
+    "MWRD.PA": {
+        "name": "Lyxor Core MSCI World DR UCITS",
+        "sleeve": SLEEVE_CORE, "category": CAT_WORLD, "target_weight": 0.05,
+        "notes": "Réplication directe MSCI World",
+    },
+    "WLD.PA": {
+        "name": "Lyxor MSCI World UCITS ETF",
+        "sleeve": SLEEVE_CORE, "category": CAT_WORLD, "target_weight": 0.05,
+        "notes": "Lyxor MSCI World classique — swap",
+    },
+    "SWLD.PA": {
+        "name": "SPDR MSCI World UCITS ETF",
+        "sleeve": SLEEVE_CORE, "category": CAT_WORLD, "target_weight": 0.04,
+        "notes": "State Street MSCI World",
+    },
+    "EWLD.PA": {
+        "name": "Lyxor MSCI All Country World UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_WORLD, "target_weight": 0.04,
+        "notes": "ACWI — inclut marchés émergents",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ÉTATS-UNIS — S&P 500 / MSCI USA
+    # ══════════════════════════════════════════════════════════════════════════
+    "PSP5.PA": {
+        "name": "Amundi PEA S&P 500 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_US, "target_weight": 0.06,
+        "notes": "S&P 500 synthétique PEA",
+    },
+    "ESE.PA": {
+        "name": "BNP Paribas Easy S&P 500 UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_US, "target_weight": 0.05,
+        "notes": "BNP Easy S&P 500 — swap PEA",
+    },
+    "SP5.PA": {
+        "name": "Amundi S&P 500 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_US, "target_weight": 0.05,
+        "notes": "S&P 500 Amundi accumulation",
+    },
+    "PUST.PA": {
+        "name": "Amundi PEA MSCI USA UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_US, "target_weight": 0.05,
+        "notes": "MSCI USA synthétique PEA",
+    },
+    "USE.PA": {
+        "name": "Amundi MSCI USA UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_US, "target_weight": 0.04,
+        "notes": "MSCI USA large cap accumulation",
+    },
+    "XSPU.PA": {
+        "name": "Xtrackers S&P 500 Swap UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_US, "target_weight": 0.03,
+        "notes": "S&P 500 Xtrackers swap",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NASDAQ / TECH
+    # ══════════════════════════════════════════════════════════════════════════
+    "PANX.PA": {
+        "name": "Amundi PEA Nasdaq-100 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_NASDAQ, "target_weight": 0.07,
+        "notes": "Nasdaq-100 synthétique PEA",
+    },
+    "ANX.PA": {
+        "name": "Amundi Nasdaq-100 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_NASDAQ, "target_weight": 0.05,
+        "notes": "Nasdaq-100 Amundi accumulation",
+    },
+    "NSDQ.PA": {
+        "name": "Lyxor Nasdaq-100 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_NASDAQ, "target_weight": 0.04,
+        "notes": "Lyxor Nasdaq-100 swap PEA",
+    },
+    "LQQ.PA": {
+        "name": "Amundi Nasdaq-100 Daily 2× Leveraged",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_NASDAQ, "target_weight": 0.01,
+        "notes": "⚠️ Levier ×2 — usage tactique uniquement",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # EUROPE — Indices larges
+    # ══════════════════════════════════════════════════════════════════════════
+    "CS51.PA": {
+        "name": "Amundi EURO STOXX 50 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EUROPE, "target_weight": 0.05,
+        "notes": "Euro Stoxx 50 — 50 leaders zone euro",
+    },
+    "MEUD.PA": {
+        "name": "Lyxor Core STOXX Europe 600 UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EUROPE, "target_weight": 0.04,
+        "notes": "Stoxx 600 — large+mid+small Europe",
+    },
+    "MEU.PA": {
+        "name": "iShares Core MSCI Europe UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EUROPE, "target_weight": 0.04,
+        "notes": "iShares MSCI Europe réplication directe",
+    },
+    "LCEU.PA": {
+        "name": "Lyxor Core MSCI Europe DR UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EUROPE, "target_weight": 0.03,
+        "notes": "Lyxor MSCI Europe Core réplication directe",
+    },
+    "ERO.PA": {
+        "name": "Lyxor EURO STOXX 300 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EUROPE, "target_weight": 0.03,
+        "notes": "Euro Stoxx 300 — zone euro élargie",
+    },
+    "MTD.PA": {
+        "name": "Amundi MSCI EMU UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EUROPE, "target_weight": 0.03,
+        "notes": "MSCI EMU — zone euro seulement",
+    },
+    "VEUR.PA": {
+        "name": "Vanguard FTSE Developed Europe ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EUROPE, "target_weight": 0.03,
+        "notes": "Vanguard Europe — TER 0.10%",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # FRANCE
+    # ══════════════════════════════════════════════════════════════════════════
+    "CAC.PA": {
+        "name": "Amundi ETF CAC 40 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_FRANCE, "target_weight": 0.03,
+        "notes": "CAC 40 — 40 plus grandes valeurs françaises",
+    },
+    "CG1.PA": {
+        "name": "Lyxor CAC 40 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_FRANCE, "target_weight": 0.02,
+        "notes": "Lyxor CAC 40 — actif phare Euronext Paris",
+    },
+    "C40.PA": {
+        "name": "BNP Paribas Easy CAC 40 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_FRANCE, "target_weight": 0.02,
+        "notes": "BNP Easy CAC 40 — swap PEA",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ALLEMAGNE
+    # ══════════════════════════════════════════════════════════════════════════
+    "XDAX.PA": {
+        "name": "Xtrackers DAX UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_GERMANY, "target_weight": 0.02,
+        "notes": "DAX — 40 plus grandes valeurs allemandes",
+    },
+    "DAX.PA": {
+        "name": "Amundi ETF DAX UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_GERMANY, "target_weight": 0.02,
+        "notes": "DAX Amundi swap PEA",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ROYAUME-UNI
+    # ══════════════════════════════════════════════════════════════════════════
+    "FTSE.PA": {
+        "name": "Lyxor FTSE 100 UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_UK, "target_weight": 0.02,
+        "notes": "FTSE 100 — UK large cap libellé EUR",
+    },
+    "UKDV.PA": {
+        "name": "iShares UK Dividend UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_UK, "target_weight": 0.02,
+        "notes": "UK dividendes — haut rendement",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # JAPON
+    # ══════════════════════════════════════════════════════════════════════════
+    "PTPXH.PA": {
+        "name": "Amundi PEA Japan TOPIX Hedged EUR",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_JAPAN, "target_weight": 0.05,
+        "notes": "TOPIX couvert EUR — PEA éligible",
+    },
+    "TNO.PA": {
+        "name": "Lyxor Japan (TOPIX) UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_JAPAN, "target_weight": 0.03,
+        "notes": "TOPIX Lyxor — non couvert JPY",
+    },
+    "JPN.PA": {
+        "name": "Amundi Japan TOPIX UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_JAPAN, "target_weight": 0.03,
+        "notes": "TOPIX Amundi accumulation",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # MARCHÉS ÉMERGENTS
+    # ══════════════════════════════════════════════════════════════════════════
+    "PAEEM.PA": {
+        "name": "Amundi PEA MSCI EM ESG UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EM, "target_weight": 0.05,
+        "notes": "EM ESG swap PEA — Chine/Inde/Brésil/Taiwan",
+    },
+    "AEEM.PA": {
+        "name": "Amundi MSCI Emerging Markets UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EM, "target_weight": 0.04,
+        "notes": "MSCI EM large cap sans filtre ESG",
+    },
+    "LEME.PA": {
+        "name": "Lyxor MSCI Emerging Markets UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EM, "target_weight": 0.03,
+        "notes": "MSCI EM Lyxor swap PEA",
+    },
+    "GEM.PA": {
+        "name": "Amundi MSCI Emerging ESG Leaders",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_EM, "target_weight": 0.02,
+        "notes": "EM ESG Leaders — meilleurs élèves",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # PETITES CAPITALISATIONS
+    # ══════════════════════════════════════════════════════════════════════════
+    "CSEM.PA": {
+        "name": "iShares MSCI Europe Small Cap UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SMALL, "target_weight": 0.04,
+        "notes": "Small cap Europe — prime de taille",
+    },
+    "RS2K.PA": {
+        "name": "Lyxor Russell 2000 UCITS PEA ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SMALL, "target_weight": 0.03,
+        "notes": "Russell 2000 — 2000 small cap US swap PEA",
+    },
+    "SMAE.PA": {
+        "name": "Amundi MSCI Europe Small Cap UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SMALL, "target_weight": 0.03,
+        "notes": "Small cap Europe Amundi",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SECTORIEL
+    # ══════════════════════════════════════════════════════════════════════════
+    "BNKE.PA": {
+        "name": "Lyxor STOXX Europe 600 Banks UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Banques européennes — cyclique, sensible aux taux",
+    },
+    "HLTE.PA": {
+        "name": "iShares STOXX Europe 600 Health Care",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Santé Europe — défensif",
+    },
+    "INRG.PA": {
+        "name": "iShares Global Clean Energy UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Énergies renouvelables mondiales",
+    },
+    "DFEN.PA": {
+        "name": "Amundi ETF Defense & Aerospace UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Défense/Aérospatial — contexte géopolitique favorable",
+    },
+    "WELTU.PA": {
+        "name": "Amundi MSCI World Luxury UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Luxe mondial — LVMH, Hermès, Richemont",
+    },
+    "FOOD.PA": {
+        "name": "Amundi STOXX Europe 600 Food UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Alimentation boissons Europe — défensif récurrent",
+    },
+    "ROBX.PA": {
+        "name": "Amundi Robotics & AI UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Robotique et IA — thème de croissance",
+    },
+    "LYXE.PA": {
+        "name": "Lyxor New Energy UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Nouvelles énergies — éolien, solaire",
+    },
+    "DGTL.PA": {
+        "name": "iShares Digital Security UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Cybersécurité mondiale",
+    },
+    "WTEC.PA": {
+        "name": "Lyxor MSCI World Information Technology",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_SECTOR, "target_weight": 0.02,
+        "notes": "Tech mondiale — au-delà du Nasdaq",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ESG / SRI
+    # ══════════════════════════════════════════════════════════════════════════
+    "SUSW.PA": {
+        "name": "iShares MSCI World SRI UCITS ETF",
+        "sleeve": SLEEVE_CORE, "category": CAT_ESG, "target_weight": 0.03,
+        "notes": "MSCI World SRI — filtre ESG strict 25% best-in-class",
+    },
+    "WLDSR.PA": {
+        "name": "Amundi MSCI World SRI PAB UCITS",
+        "sleeve": SLEEVE_CORE, "category": CAT_ESG, "target_weight": 0.03,
+        "notes": "MSCI World SRI Paris-Aligned",
+    },
+    "ESGL.PA": {
+        "name": "iShares MSCI Europe SRI UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_ESG, "target_weight": 0.02,
+        "notes": "MSCI Europe SRI — 25% meilleurs par secteur",
+    },
+    "CLIM.PA": {
+        "name": "Amundi MSCI World Climate UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_ESG, "target_weight": 0.02,
+        "notes": "Transition climatique — faible empreinte carbone",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # FACTEURS — Smart Beta
+    # ══════════════════════════════════════════════════════════════════════════
+    "IWMO.PA": {
+        "name": "iShares MSCI World Momentum UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_FACTOR, "target_weight": 0.03,
+        "notes": "Momentum factor mondial",
+    },
+    "IWQU.PA": {
+        "name": "iShares MSCI World Quality UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_FACTOR, "target_weight": 0.03,
+        "notes": "Quality factor — ROE élevé, faible levier",
+    },
+    "IWVL.PA": {
+        "name": "iShares MSCI World Value Factor UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_FACTOR, "target_weight": 0.03,
+        "notes": "Value factor — P/B et P/E faibles",
+    },
+    "MVOL.PA": {
+        "name": "iShares MSCI World Min Vol UCITS ETF",
+        "sleeve": SLEEVE_DEFENSIVE, "category": CAT_FACTOR, "target_weight": 0.03,
+        "notes": "Minimum volatilité mondiale — défensif",
+    },
+    "EUMF.PA": {
+        "name": "iShares MSCI Europe Multifactor UCITS",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_FACTOR, "target_weight": 0.02,
+        "notes": "Multi-facteur Europe — value+quality+momentum",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # DIVIDENDES
+    # ══════════════════════════════════════════════════════════════════════════
+    "DJEA.PA": {
+        "name": "Lyxor DJ Euro STOXX Select Div 30",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_DIVIDEND, "target_weight": 0.03,
+        "notes": "30 valeurs à plus hauts dividendes zone euro",
+    },
+    "IDVY.PA": {
+        "name": "iShares Euro Dividend UCITS ETF",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_DIVIDEND, "target_weight": 0.02,
+        "notes": "Dividendes zone euro — iShares distributif",
+    },
+    "TDIV.PA": {
+        "name": "VanEck Morningstar Dev Markets Div",
+        "sleeve": SLEEVE_AGGRESSIVE, "category": CAT_DIVIDEND, "target_weight": 0.02,
+        "notes": "Dividendes marchés développés screened Morningstar",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # MONÉTAIRE PEA — Substitut cash
+    # ══════════════════════════════════════════════════════════════════════════
+    "OBLI.PA": {
+        "name": "Amundi PEA Euro Court Terme UCITS",
+        "sleeve": SLEEVE_DEFENSIVE, "category": CAT_MONEY, "target_weight": 0.04,
+        "notes": "Parking monétaire PEA — substitut liquidités",
+    },
+}
+
+CORE_ANCHOR = "DCAM.PA"
+
+
+def get_etf_metadata() -> pd.DataFrame:
+    rows = [{"ticker": t, **m} for t, m in PEA_UNIVERSE.items()]
+    return pd.DataFrame(rows).set_index("ticker")
+
+
+def get_satellite_tickers() -> list[str]:
+    return [t for t, m in PEA_UNIVERSE.items() if m["sleeve"] == SLEEVE_AGGRESSIVE]
+
+
+def get_all_tickers() -> list[str]:
+    return list(PEA_UNIVERSE.keys())
+
+
+def get_categories() -> list[str]:
+    seen: list[str] = []
+    for m in PEA_UNIVERSE.values():
+        if m["category"] not in seen:
+            seen.append(m["category"])
+    return seen
