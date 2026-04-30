@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { Sidebar } from './components/Sidebar'
 import Strategy  from './pages/Strategy'
@@ -38,7 +38,8 @@ export default function App() {
             <Routes>
               <Route path="/"          element={<Strategy />}  />
               <Route path="/signals"   element={<Signals />}   />
-              <Route path="/allocation" element={<Allocation />} />
+              <Route path="/concentration" element={<Allocation />} />
+              <Route path="/allocation" element={<Navigate to="/concentration" replace />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/settings"  element={<Settings />}  />
             </Routes>

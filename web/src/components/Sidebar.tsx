@@ -4,7 +4,7 @@ import { TrendingUp, BarChart2, PieChart, Wallet, Settings, X } from 'lucide-rea
 const links = [
   { to: '/',          icon: TrendingUp, label: 'Stratégie'    },
   { to: '/signals',   icon: BarChart2,  label: 'Signaux ETF'  },
-  { to: '/allocation', icon: PieChart,   label: 'Allocation'   },
+  { to: '/concentration', icon: PieChart, label: 'Concentration' },
   { to: '/portfolio', icon: Wallet,     label: 'Portefeuille' },
   { to: '/settings',  icon: Settings,   label: 'Réglages'     },
 ]

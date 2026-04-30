@@ -358,7 +358,7 @@ export default function Allocation() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-ink">Allocation</h1>
+        <h1 className="text-xl font-semibold text-ink">Concentration</h1>
         <p className="text-sm text-graphite-muted mt-0.5">
           {selected.length} fonds · total saisi {fmt(totalRaw)} · estimation par profils ETF
         </p>

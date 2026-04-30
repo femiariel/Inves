@@ -3,7 +3,7 @@ PEA 80/20 strategy — port of PEAStore business logic.
 
 Rules:
   • 80% → core anchor (DCAM.PA by default, MSCI World)
-  • 20% → top-N satellite ETFs with momentum_filter_ok (r12M > 0)
+  • 20% → top-N satellite ETFs with momentum_filter_ok (12-1M > 0 and above SMA 200)
   • If no satellite passes the filter → 20% cash reserve
   • Monthly rebalancing in backtest
 """
@@ -58,7 +58,8 @@ def build_proposal(
     if top_satellites:
         sat_each = 0.20 / len(top_satellites)
         for s in top_satellites:
-            r12m_str = f"{s['r12M']*100:+.1f}%" if not math.isnan(s["r12M"]) else "n/a"
+            r12_1m = s.get("r12_1M", math.nan)
+            r12_1m_str = f"{r12_1m*100:+.1f}%" if not math.isnan(r12_1m) else "n/a"
             lines.append({
                 "ticker":    s["ticker"],
                 "name":      s["name"],
@@ -67,7 +68,7 @@ def build_proposal(
                 "weight":    sat_each,
                 "value":     capital * sat_each,
                 "score":     s["score"],
-                "rationale": f"Momentum score {s['score']:.1f} • 12M {r12m_str}",
+                "rationale": f"Momentum score {s['score']:.1f} • 12-1M {r12_1m_str}",
             })
     else:
         cash_reserve_pct = 0.20
@@ -79,7 +80,7 @@ def build_proposal(
             "weight":    0.20,
             "value":     capital * 0.20,
             "score":     None,
-            "rationale": "Aucun ETF satellite avec momentum 12M positif — filtre cash activé",
+            "rationale": "Aucun ETF satellite avec régime positif — filtre cash activé",
         })
 
     # ── Expected return / risk estimates ─────────────────────────────────────

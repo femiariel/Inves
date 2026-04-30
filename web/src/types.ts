@@ -10,6 +10,7 @@ export interface Signal {
   r3M: number | null
   r6M: number | null
   r12M: number | null
+  r12_1M: number | null
   momentum_component: number
   trend_component: number
   risk_penalty: number
@@ -21,9 +22,13 @@ export interface Signal {
   allocation_eligible: boolean
   factor_score: number
   momentum_z: number
+  momentum_12_1m_z: number
+  momentum_6m_z: number
+  momentum_3m_z: number
   trend_z: number
   vol_z: number
   drawdown_z: number
+  overheat_penalty: number
   recommendation: Rec
   rec_label: string
   rec_color: string

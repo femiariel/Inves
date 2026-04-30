@@ -526,10 +526,11 @@ with tab_etf:
 
             # Returns table
             rows = [
-                ("1 mois",  sig["r1M"],  0.12),
-                ("3 mois",  sig["r3M"],  0.25),
-                ("6 mois",  sig["r6M"],  0.30),
-                ("12 mois", sig["r12M"], 0.33),
+                ("1 mois",  sig["r1M"], None),
+                ("3 mois",  sig["r3M"], 0.10),
+                ("6 mois",  sig["r6M"], 0.18),
+                ("12-1 mois", sig.get("r12_1M", math.nan), 0.45),
+                ("12 mois", sig["r12M"], None),
             ]
             st.markdown(f"""
             <div class="pea-card">
@@ -537,7 +538,7 @@ with tab_etf:
               {"".join(f'''
               <div style="display:flex;justify-content:space-between;padding:0.4rem 0;
                           border-bottom:1px solid {C['border']};font-size:0.85rem">
-                <span style="color:{C['text2']}">{label} <span style="font-size:0.72rem">(w={w:.0%})</span></span>
+                <span style="color:{C['text2']}">{label} {f'<span style="font-size:0.72rem">(w={w:.0%})</span>' if w is not None else ''}</span>
                 <span style="font-weight:600;color:{C['green'] if not math.isnan(r) and r>0 else C['red']}">{_pct(r)}</span>
               </div>''' for label, r, w in rows)}
             </div>""", unsafe_allow_html=True)

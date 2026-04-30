@@ -12,7 +12,7 @@ const pct = (n: number | null) =>
 const price = (n: number | null) =>
   n == null ? '—' : `${n.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} €`
 
-type SortKey = 'score' | 'r1M' | 'r3M' | 'r6M' | 'r12M' | 'annual_vol'
+type SortKey = 'score' | 'r1M' | 'r3M' | 'r6M' | 'r12_1M' | 'r12M' | 'annual_vol'
 type Dir = 'asc' | 'desc'
 
 function SortIcon({ col, active, dir }: { col: string; active: boolean; dir: Dir }) {
@@ -125,6 +125,7 @@ export default function Signals() {
                 <Th col="r1M"        label="1M" />
                 <Th col="r3M"        label="3M" />
                 <Th col="r6M"        label="6M" />
+                <Th col="r12_1M"     label="12-1M" />
                 <Th col="r12M"       label="12M" />
                 <Th col="annual_vol" label="Vol" />
                 <th className="pb-3 pr-5 text-right pt-3">Prix</th>
@@ -153,6 +154,9 @@ export default function Signals() {
                   <td className={`py-3 pr-4 text-right tabular-nums text-xs ${
                     s.r6M == null ? 'text-graphite-subtle' : s.r6M >= 0 ? 'text-forest' : 'text-danger'
                   }`}>{pct(s.r6M)}</td>
+                  <td className={`py-3 pr-4 text-right tabular-nums text-xs font-medium ${
+                    s.r12_1M == null ? 'text-graphite-subtle' : s.r12_1M >= 0 ? 'text-forest' : 'text-danger'
+                  }`}>{pct(s.r12_1M)}</td>
                   <td className={`py-3 pr-4 text-right tabular-nums text-xs font-medium ${
                     s.r12M == null ? 'text-graphite-subtle' : s.r12M >= 0 ? 'text-forest' : 'text-danger'
                   }`}>{pct(s.r12M)}</td>
