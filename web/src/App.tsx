@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react'
 import { Sidebar } from './components/Sidebar'
 import Strategy  from './pages/Strategy'
 import Signals   from './pages/Signals'
+import Allocation from './pages/Allocation'
 import Portfolio from './pages/Portfolio'
 import Settings  from './pages/Settings'
 
@@ -37,6 +38,7 @@ export default function App() {
             <Routes>
               <Route path="/"          element={<Strategy />}  />
               <Route path="/signals"   element={<Signals />}   />
+              <Route path="/allocation" element={<Allocation />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/settings"  element={<Settings />}  />
             </Routes>

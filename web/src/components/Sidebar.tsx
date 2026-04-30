@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { TrendingUp, BarChart2, Wallet, Settings, X } from 'lucide-react'
+import { TrendingUp, BarChart2, PieChart, Wallet, Settings, X } from 'lucide-react'
 
 const links = [
   { to: '/',          icon: TrendingUp, label: 'Stratégie'    },
   { to: '/signals',   icon: BarChart2,  label: 'Signaux ETF'  },
+  { to: '/allocation', icon: PieChart,   label: 'Allocation'   },
   { to: '/portfolio', icon: Wallet,     label: 'Portefeuille' },
   { to: '/settings',  icon: Settings,   label: 'Réglages'     },
 ]
