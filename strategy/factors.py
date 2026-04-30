@@ -13,11 +13,11 @@ recent month. This keeps the signal focused on the established trend instead
 of rewarding a late news spike too aggressively.
 
 Score interpretation:
-  50 = neutral relative to the valid universe
-  70+ = strong
-  55-70 = stable / constructive
-  40-55 = weak
-  <40 = avoid
+  35 = neutral relative to the valid universe
+  65+ = strong
+  50-65 = stable / constructive
+  35-50 = weak
+  <35 = avoid
 
 Current raw score:
   0.45 * z(12-1M momentum)
@@ -45,9 +45,12 @@ TD_6M  = 126
 TD_12M = 252
 
 # Score thresholds on the final 0-100 scale
-THRESHOLD_BUY  = 70.0
-THRESHOLD_HOLD = 55.0
-THRESHOLD_TRIM = 40.0
+SCORE_BASE  = 35.0
+SCORE_SCALE = 12.0
+
+THRESHOLD_BUY  = 65.0
+THRESHOLD_HOLD = 50.0
+THRESHOLD_TRIM = 35.0
 
 # Trend
 SMA_PERIOD = 200
@@ -287,7 +290,7 @@ def _score_signals(raw_signals: list[dict]) -> list[dict]:
             + FACTOR_WEIGHTS["drawdown"] * drawdown_z
             - overheat_penalty
         )
-        score = max(0.0, min(100.0, 50.0 + 15.0 * factor_score))
+        score = max(0.0, min(100.0, SCORE_BASE + SCORE_SCALE * factor_score))
 
         sig.update({
             "momentum_z": momentum_12_1m_z,
@@ -308,7 +311,7 @@ def _score_signals(raw_signals: list[dict]) -> list[dict]:
                     -FACTOR_WEIGHTS["vol"] * vol_z
                     - FACTOR_WEIGHTS["drawdown"] * drawdown_z
                     + overheat_penalty
-                ) * 15.0,
+                ) * SCORE_SCALE,
             ),
         })
         scored.append(_finalize_signal(sig))
