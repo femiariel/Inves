@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
@@ -27,6 +27,9 @@ const defaults: AllocationLine[] = [
 ]
 
 const fmt = (n: number) => `${n.toFixed(1)} %`
+
+const optionLabel = (etf?: ETFMeta) => etf ? `${etf.ticker} - ${etf.name}` : ''
+const searchableText = (etf: ETFMeta) => `${etf.ticker} ${etf.name} ${etf.category}`.toLowerCase()
 
 function emptyProfile(): Profile {
   return {
@@ -211,6 +214,92 @@ function redundancyAlerts(rows: Array<{ etf: ETFMeta; weight: number; profile: P
   return alerts
 }
 
+function FundPicker({
+  etfs,
+  value,
+  onChange,
+}: {
+  etfs: ETFMeta[]
+  value: string
+  onChange: (ticker: string) => void
+}) {
+  const selected = etfs.find(etf => etf.ticker === value)
+  const [query, setQuery] = useState(optionLabel(selected))
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    setQuery(optionLabel(selected))
+  }, [selected?.ticker])
+
+  const filtered = useMemo(() => {
+    const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean)
+    const matches = terms.length === 0
+      ? etfs
+      : etfs.filter(etf => terms.every(term => searchableText(etf).includes(term)))
+    return matches.slice(0, 10)
+  }, [etfs, query])
+
+  const choose = (etf: ETFMeta) => {
+    onChange(etf.ticker)
+    setQuery(optionLabel(etf))
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative min-w-0">
+      <input
+        value={query}
+        onFocus={e => {
+          e.currentTarget.select()
+          setOpen(true)
+        }}
+        onBlur={() => window.setTimeout(() => {
+          setOpen(false)
+          setQuery(optionLabel(selected))
+        }, 120)}
+        onChange={e => {
+          setQuery(e.target.value)
+          setOpen(true)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && filtered[0]) {
+            e.preventDefault()
+            choose(filtered[0])
+          }
+          if (e.key === 'Escape') {
+            setOpen(false)
+            setQuery(optionLabel(selected))
+          }
+        }}
+        placeholder="Rechercher ticker ou nom..."
+        className="w-full min-w-0 px-3 py-2 rounded-lg border border-black/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-forest/30"
+      />
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 max-h-72 overflow-y-auto rounded-lg border border-black/10 bg-white shadow-lg">
+          {filtered.length > 0 ? filtered.map(etf => (
+            <button
+              key={etf.ticker}
+              type="button"
+              onMouseDown={e => {
+                e.preventDefault()
+                choose(etf)
+              }}
+              className="w-full px-3 py-2 text-left hover:bg-forest/8 focus:bg-forest/8 focus:outline-none"
+            >
+              <div className="text-sm font-medium text-ink">{etf.ticker}</div>
+              <div className="text-xs text-graphite-muted truncate">{etf.name}</div>
+              <div className="text-[11px] text-graphite-subtle">{etf.category}</div>
+            </button>
+          )) : (
+            <div className="px-3 py-3 text-sm text-graphite-muted">Aucun ETF trouvé</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Allocation() {
   const { data: universe, loading, error } = useApi(() => api.universe())
   const [lines, setLines] = useState<AllocationLine[]>(defaults)
@@ -290,15 +379,11 @@ export default function Allocation() {
         <div className="space-y-2">
           {lines.map(line => (
             <div key={line.id} className="grid grid-cols-[minmax(0,1fr)_96px_32px] gap-2 items-center">
-              <select
+              <FundPicker
+                etfs={universe ?? []}
                 value={line.ticker}
-                onChange={e => updateLine(line.id, { ticker: e.target.value })}
-                className="min-w-0 px-3 py-2 rounded-lg border border-black/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-forest/30"
-              >
-                {(universe ?? []).map(etf => (
-                  <option key={etf.ticker} value={etf.ticker}>{etf.ticker} - {etf.name}</option>
-                ))}
-              </select>
+                onChange={ticker => updateLine(line.id, { ticker })}
+              />
               <input
                 type="number"
                 min="0"
