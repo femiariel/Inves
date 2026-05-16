@@ -13,8 +13,8 @@ STORE_PATH = Path(__file__).parent.parent / "data" / "portfolio.json"
 
 DEFAULT_SETTINGS = {
     "broker_name":   "Boursobank PEA",
-    "data_source":   "Yahoo Finance",
-    "eodhd_api_key": "69ecfa7ed81d63.29086352",
+    "data_source":   "EODHD",
+    "eodhd_api_key": "",
     "capital":       10_000.0,
     "top_n":         5,
     "currency":      "EUR",

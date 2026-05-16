@@ -2,8 +2,8 @@
 Fetch ETF market data once and write it to the local SQLite cache.
 
 Examples:
-  python scripts/fetch_market_data.py --source yahoo --years 2
   EODHD_API_KEY=... python scripts/fetch_market_data.py --source eodhd --years 5
+  python scripts/fetch_market_data.py --source eodhd --years 5  # reads .env
 """
 
 from __future__ import annotations
@@ -25,10 +25,35 @@ from data.pea_universe import get_all_tickers
 
 
 SOURCE_CHOICES = {
-    "mock": DataSource.MOCK,
-    "yahoo": DataSource.YAHOO,
     "eodhd": DataSource.EODHD,
 }
+
+BAR_WIDTH = 34
+
+
+def env_value(key: str, default: str = "") -> str:
+    if os.environ.get(key):
+        return os.environ[key]
+
+    env_path = ROOT / ".env"
+    if not env_path.exists():
+        return default
+
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        if k.strip() == key:
+            return v.strip().strip('"').strip("'")
+    return default
+
+
+def progress_bar(done: int, total: int, width: int = BAR_WIDTH) -> str:
+    if total <= 0:
+        return "[" + "-" * width + "]"
+    filled = int(width * done / total)
+    return "[" + "#" * filled + "-" * (width - filled) + "]"
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,8 +63,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--source",
         choices=SOURCE_CHOICES,
-        default="yahoo",
-        help="Data source to request. EODHD falls back to Yahoo per ticker.",
+        default="eodhd",
+        help="Data source to request. Only EODHD is supported.",
     )
     parser.add_argument(
         "--years",
@@ -50,8 +75,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--api-key",
-        default=os.environ.get("EODHD_API_KEY", ""),
-        help="EODHD API key. Can also be provided through EODHD_API_KEY.",
+        default=env_value("EODHD_API_KEY"),
+        help="EODHD API key. Can also be provided through EODHD_API_KEY or .env.",
     )
     parser.add_argument(
         "--keep-existing",
@@ -74,17 +99,66 @@ def main() -> int:
 
     db.init_db()
 
-    print(f"Fetching {len(tickers)} ETF tickers from {args.source} ({args.years}y)...")
-    fetched = fetch_all_with_sources(
-        tickers,
-        source=requested_source,
-        api_key=args.api_key,
-        years=args.years,
-    )
+    if requested_source == DataSource.EODHD and (not args.api_key or args.api_key == "demo"):
+        print(
+            "EODHD API key missing. Set EODHD_API_KEY in .env, export it, "
+            "or pass --api-key.",
+            file=sys.stderr,
+        )
+        return 2
+
+    print(f"Fetching {len(tickers)} ETF tickers from {args.source} ({args.years}y)...", flush=True)
+
+    progress_counts: Counter[str] = Counter()
+    failures_by_ticker: dict[str, dict] = {}
+
+    def show_progress(event: dict) -> None:
+        status = event["status"]
+        progress_counts[status] += 1
+        if status != "ok":
+            failures_by_ticker[event["ticker"]] = event
+        done = int(event["index"])
+        total = int(event["total"])
+        percent = done / total * 100 if total else 100.0
+        ok = progress_counts["ok"]
+        missing = done - ok
+        detail = f"{event['rows']} rows" if status == "ok" else status.replace("_", " ")
+        print(
+            "\r"
+            f"{progress_bar(done, total)} "
+            f"{percent:6.2f}% "
+            f"{done:>3}/{total:<3} "
+            f"{event['ticker']:<12} "
+            f"{detail:<18} "
+            f"ok={ok:<3} missing={missing:<3} attempts={event['attempts']}",
+            end="",
+            flush=True,
+        )
+
+    try:
+        fetched = fetch_all_with_sources(
+            tickers,
+            source=requested_source,
+            api_key=args.api_key,
+            years=args.years,
+            progress=show_progress,
+        )
+    except ValueError as exc:
+        print()
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    print()
 
     if not fetched:
         print("No prices were fetched. Existing cache was left unchanged.")
         return 1
+
+    too_short = {
+        ticker: len(frame)
+        for ticker, (frame, _) in fetched.items()
+        if len(frame) < args.min_rows
+    }
 
     fetched = {
         ticker: (frame, actual_source)
@@ -121,6 +195,16 @@ def main() -> int:
         preview = ", ".join(missing[:20])
         suffix = "..." if len(missing) > 20 else ""
         print(f"Missing {len(missing)} tickers: {preview}{suffix}")
+        print("Missing details:")
+        for ticker in missing:
+            if ticker in too_short:
+                print(f"  {ticker}: history too short ({too_short[ticker]} rows < {args.min_rows})")
+            elif ticker in failures_by_ticker:
+                status = failures_by_ticker[ticker]["status"].replace("_", " ")
+                attempts = failures_by_ticker[ticker]["attempts"]
+                print(f"  {ticker}: {status} after {attempts} attempt(s)")
+            else:
+                print(f"  {ticker}: not returned by EODHD")
 
     return 0 if fetched else 1
 

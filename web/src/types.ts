@@ -110,6 +110,126 @@ export interface ETFMeta {
   notes: string
 }
 
+export interface StressIndicator {
+  id: string
+  label: string
+  description: string
+  value: number | null
+  value_label: string | null
+  percentile: number | null
+  stress: number
+  status: 'green' | 'orange' | 'red' | 'unknown'
+  interpretation: string
+  weight: number
+}
+
+export interface StressDashboard {
+  composite_score: number
+  composite_status: 'green' | 'orange' | 'red'
+  composite_label: string
+  indicators: StressIndicator[]
+  computed_at: number
+}
+
+export type SensitivityLevel = 'very_high' | 'high' | 'medium' | 'low'
+
+export interface ETFCrashProfile {
+  level: SensitivityLevel
+  label: string
+  color: string
+  bg_color: string
+  multiplier: number
+  relevant_indicators: string[]
+  crash_context: string
+  description: string
+  warning_threshold: number
+}
+
+export interface ETFStressAnalysis {
+  ticker: string
+  crash_profile: ETFCrashProfile
+  stress: StressDashboard
+  risk_score: number
+  risk_status: 'green' | 'orange' | 'red'
+  risk_label: string
+  risk_summary: string
+}
+
+// ── News ──────────────────────────────────────────────────────────────────────
+
+export type SentimentLabel = 'positive' | 'negative' | 'neutral'
+
+export interface NewsArticle {
+  date: string
+  title: string
+  content: string
+  link: string
+  symbols: string[]
+  tags: string[]
+  sentiment: { polarity: number | null; label: SentimentLabel }
+}
+
+export interface NewsFeed {
+  articles: NewsArticle[]
+  source: string
+  us_benchmark?: string
+  cached_at: number
+}
+
+// ── Sleeve A ──────────────────────────────────────────────────────────────────
+
+export interface SleeveARegime {
+  regime: 'on' | 'off' | 'unknown'
+  filter_ticker: string
+  price: number | null
+  sma200: number | null
+  ratio: number | null
+  data_available: boolean
+}
+
+export interface SleeveASignal {
+  ticker: string
+  name: string
+  category: string
+  mom_6m: number | null
+  latest_price: number | null
+  data_available: boolean
+  rank: number | null
+}
+
+export interface SleeveAPosition {
+  ticker: string
+  name: string
+  category: string
+  weight: number
+  mom_6m?: number | null
+  rank?: number | null
+  rationale: string
+  latest_price: number | null
+}
+
+export interface SleeveACorrPair {
+  t1: string
+  t2: string
+  corr: number
+}
+
+export interface SleeveAAllocation {
+  regime: SleeveARegime
+  positions: SleeveAPosition[]
+  corr_pairs: SleeveACorrPair[]
+  guardrail_applied: boolean
+  corr_threshold?: number
+}
+
+export interface SleeveAResult {
+  regime: SleeveARegime
+  signals: SleeveASignal[]
+  allocation: SleeveAAllocation
+  data_coverage: { available: number; total: number }
+  computed_at: number
+}
+
 export interface BacktestPoint {
   date: string
   value: number

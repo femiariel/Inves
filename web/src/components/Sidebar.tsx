@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom'
-import { TrendingUp, BarChart2, PieChart, Wallet, Settings, X } from 'lucide-react'
+import { TrendingUp, PieChart, Wallet, Settings, X, Layers, Newspaper } from 'lucide-react'
 
 const links = [
-  { to: '/',          icon: TrendingUp, label: 'Stratégie'    },
-  { to: '/signals',   icon: BarChart2,  label: 'Signaux ETF'  },
-  { to: '/concentration', icon: PieChart, label: 'Concentration' },
-  { to: '/portfolio', icon: Wallet,     label: 'Portefeuille' },
-  { to: '/settings',  icon: Settings,   label: 'Réglages'     },
+  { to: '/',               icon: TrendingUp, label: 'Stratégie'    },
+  { to: '/sleeve-a',       icon: Layers,     label: 'Sleeve A'     },
+  { to: '/news',           icon: Newspaper,  label: 'Actualités'   },
+  { to: '/concentration',  icon: PieChart,   label: 'Concentration' },
+  { to: '/portfolio',      icon: Wallet,     label: 'Portefeuille' },
+  { to: '/settings',       icon: Settings,   label: 'Réglages'     },
 ]
 
 interface Props {

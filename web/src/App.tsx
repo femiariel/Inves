@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { Sidebar } from './components/Sidebar'
-import Strategy  from './pages/Strategy'
-import Signals   from './pages/Signals'
-import Allocation from './pages/Allocation'
-import Portfolio from './pages/Portfolio'
-import Settings  from './pages/Settings'
+import Strategy   from './pages/Strategy'
+import SleeveA    from './pages/SleeveA'
+import News       from './pages/News'
+import Allocation  from './pages/Allocation'
+import Portfolio   from './pages/Portfolio'
+import Settings    from './pages/Settings'
 
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -37,7 +38,8 @@ export default function App() {
           <div className="p-4 md:p-8 flex-1">
             <Routes>
               <Route path="/"          element={<Strategy />}  />
-              <Route path="/signals"   element={<Signals />}   />
+              <Route path="/sleeve-a"  element={<SleeveA />}   />
+              <Route path="/news"      element={<News />}      />
               <Route path="/concentration" element={<Allocation />} />
               <Route path="/allocation" element={<Navigate to="/concentration" replace />} />
               <Route path="/portfolio" element={<Portfolio />} />

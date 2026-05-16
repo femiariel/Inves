@@ -1,5 +1,6 @@
 import type {
   Signal, ProposalResponse, Holding, Settings, ETFMeta, BacktestResult,
+  ETFStressAnalysis, StressDashboard, SleeveAResult, NewsFeed,
 } from '../types'
 
 const BASE = ''  // Caddy proxies /api/* → FastAPI
@@ -25,6 +26,10 @@ export const api = {
 
   backtest: () => req<BacktestResult>('/api/backtest'),
 
+  stressDashboard: () => req<StressDashboard>('/api/stress'),
+
+  stress: (ticker: string) => req<ETFStressAnalysis>(`/api/stress/${ticker}`),
+
   holdings: {
     list: () => req<Holding[]>('/api/holdings'),
     upsert: (body: { ticker: string; quantity: number; avg_cost: number }) =>
@@ -41,5 +46,15 @@ export const api = {
 
   cache: {
     clear: () => req<{ ok: boolean; message: string }>('/api/cache/clear', { method: 'POST' }),
+  },
+
+  sleeveA: (corrThreshold?: number) => {
+    const params = corrThreshold !== undefined ? `?corr_threshold=${corrThreshold}` : ''
+    return req<SleeveAResult>(`/api/sleeve-a${params}`)
+  },
+
+  news: {
+    market: (limit = 50, offset = 0) => req<NewsFeed>(`/api/news?limit=${limit}&offset=${offset}`),
+    ticker: (ticker: string, limit = 50, offset = 0) => req<NewsFeed>(`/api/news/${ticker}?limit=${limit}&offset=${offset}`),
   },
 }

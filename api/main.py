@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import api.db as db
-from api.routes import universe, signals, proposal, backtest, portfolio, settings
+from api.routes import universe, signals, proposal, backtest, portfolio, settings, sleeve_a, news
 
 
 @asynccontextmanager
@@ -21,5 +21,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for mod in [universe, signals, proposal, backtest, portfolio, settings]:
+for mod in [universe, signals, proposal, backtest, portfolio, settings, sleeve_a, news]:
     app.include_router(mod.router, prefix="/api")

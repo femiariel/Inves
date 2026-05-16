@@ -1,14 +1,12 @@
 """
 ETF universe: curated list of liquid ETFs traded on Euronext (Paris, Amsterdam, Brussels, Lisbon).
-Tickers are suffixed for yfinance: .PA (Paris), .AS (Amsterdam), .BR (Brussels).
+Tickers use EODHD exchange suffixes: .PA (Paris), .AS (Amsterdam), .BR (Brussels).
 """
 
 from __future__ import annotations
 
 import pandas as pd
-import yfinance as yf
 from pathlib import Path
-import json
 
 CACHE_PATH = Path(__file__).parent / "etf_cache.json"
 
@@ -109,49 +107,12 @@ def fetch_prices(
     use_cache: bool = True,
 ) -> pd.DataFrame:
     """
-    Download adjusted close prices for the ETF universe from yfinance.
-    Returns a DataFrame with dates as index and tickers as columns.
-    Drops tickers with >30% missing data.
+    Deprecated compatibility shim.
+
+    Use scripts/fetch_market_data.py with EODHD instead. This module now only
+    owns static Euronext metadata.
     """
-    if tickers is None:
-        tickers = list(EURONEXT_ETFS.keys())
-
-    if use_cache and CACHE_PATH.exists():
-        cached = json.loads(CACHE_PATH.read_text())
-        if cached.get("period") == period:
-            df = pd.DataFrame(cached["data"])
-            df.index = pd.to_datetime(df.index)
-            return df
-
-    print(f"Downloading prices for {len(tickers)} ETFs...")
-    raw = yf.download(
-        tickers,
-        period=period,
-        auto_adjust=True,
-        progress=False,
-        threads=True,
-    )
-
-    if isinstance(raw.columns, pd.MultiIndex):
-        prices = raw["Close"]
-    else:
-        prices = raw[["Close"]].rename(columns={"Close": tickers[0]})
-
-    # Drop tickers with too many missing values
-    threshold = 0.70
-    prices = prices.dropna(axis=1, thresh=int(len(prices) * threshold))
-    prices = prices.ffill().dropna()
-
-    if use_cache:
-        CACHE_PATH.write_text(json.dumps({
-            "period": period,
-            "data": {
-                str(k): v
-                for k, v in prices.to_dict(orient="index").items()
-            }
-        }))
-
-    return prices
+    raise RuntimeError("Use scripts/fetch_market_data.py --source eodhd to fetch prices.")
 
 
 def invalidate_cache():

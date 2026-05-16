@@ -55,8 +55,9 @@ THRESHOLD_TRIM = 35.0
 # Trend
 SMA_PERIOD = 200
 
-# Data quality / sanity guards. Yahoo can occasionally expose bad adjusted
-# histories on European ETC/leveraged products, producing fake +20,000% returns.
+# Data quality / sanity guards. Market data providers can occasionally expose
+# bad adjusted histories on European ETC/leveraged products, producing fake
+# +20,000% returns.
 MIN_OBSERVATIONS      = TD_12M + 1
 MAX_ABS_DAILY_RETURN  = 1.00  # one-day move above 100% is treated as bad data
 MAX_ABS_LOOKBACK_RET  = 3.00  # +/-300% over a lookback is not normal ETF data

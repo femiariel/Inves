@@ -6,8 +6,6 @@ import { PageLoader } from '../components/Spinner'
 import type { Settings } from '../types'
 
 const SOURCE_LABELS: Record<string, string> = {
-  mock: 'Hors-ligne (démo)',
-  yahoo: 'Yahoo Finance',
   eodhd: 'EODHD',
 }
 

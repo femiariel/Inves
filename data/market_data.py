@@ -1,36 +1,45 @@
 """
-Market data fetching: EODHD (primary) → Yahoo Finance (fallback) → Mock (offline).
+Market data fetching: EODHD only.
 Returns per-ticker DataFrames with a DatetimeIndex and a 'close' column.
 
-Yahoo fetches all tickers in one batch call to avoid per-ticker rate limiting.
+A failed ticker is left missing after retries rather than silently mixing
+providers.
 """
 
 from __future__ import annotations
 
-import hashlib
-import math
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date, timedelta
 from enum import Enum
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 import requests
-import yfinance as yf
 
 
 class DataSource(str, Enum):
     EODHD = "EODHD"
-    YAHOO = "Yahoo Finance"
-    MOCK  = "Hors-ligne (démo)"
 
 
-YAHOO_CHUNK = 100  # tickers per batch request
+EODHD_MAX_ATTEMPTS = 3
+EODHD_RETRY_SLEEP = 1.0
 
-SOURCE_MOCK = "mock"
-SOURCE_YAHOO = "yahoo"
 SOURCE_EODHD = "eodhd"
+
+EODHD_OK = "ok"
+EODHD_RETRYABLE_FAILURE = "retryable_failure"
+EODHD_NO_DATA = "no_data"
+EODHD_AUTH_ERROR = "auth_error"
+EODHD_QUOTA_EXCEEDED = "quota_exceeded"
+
+
+@dataclass(frozen=True)
+class EodhdAttempt:
+    df: Optional[pd.DataFrame]
+    status: str
+    message: str = ""
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -40,13 +49,19 @@ def fetch_all(
     source: DataSource,
     api_key: str = "",
     years: int = 2,
+    progress: Optional[Callable[[dict], None]] = None,
 ) -> dict[str, pd.DataFrame]:
     """
     Fetch historical close prices for every ticker.
     Returns {ticker: DataFrame(index=date, columns=['close'])}.
     Silently drops tickers that fail to load.
     """
-    return {ticker: df for ticker, (df, _) in fetch_all_with_sources(tickers, source, api_key, years).items()}
+    return {
+        ticker: df
+        for ticker, (df, _) in fetch_all_with_sources(
+            tickers, source, api_key, years, progress=progress
+        ).items()
+    }
 
 
 def fetch_all_with_sources(
@@ -54,117 +69,107 @@ def fetch_all_with_sources(
     source: DataSource,
     api_key: str = "",
     years: int = 2,
+    progress: Optional[Callable[[dict], None]] = None,
 ) -> dict[str, tuple[pd.DataFrame, str]]:
     """
     Fetch historical close prices and keep the actual source used per ticker.
     Returns {ticker: (DataFrame(index=date, columns=['close']), source_key)}.
     """
-    if source == DataSource.MOCK:
-        return {t: (_mock(t, years * 252), SOURCE_MOCK) for t in tickers}
-
     if source == DataSource.EODHD:
-        return _fetch_all_eodhd_with_sources(tickers, api_key, years)
+        return _fetch_all_eodhd_with_sources(tickers, api_key, years, progress=progress)
 
-    # Yahoo (default)
-    return {
-        ticker: (df, SOURCE_YAHOO)
-        for ticker, df in _fetch_all_yahoo(tickers, years).items()
-    }
+    raise ValueError("Only EODHD market data is supported.")
 
 
 def invalidate_cache(*_: object) -> None:
     pass  # cache now handled by SQLite in api/db.py
 
 
-# ── Yahoo batch ───────────────────────────────────────────────────────────────
+# ── EODHD individual ──────────────────────────────────────────────────────────
 
-def _fetch_all_yahoo(tickers: list[str], years: int) -> dict[str, pd.DataFrame]:
-    period_map = {1: "1y", 2: "2y", 3: "3y", 5: "5y"}
-    period = period_map.get(years, "2y")
-    results: dict[str, pd.DataFrame] = {}
-
-    for i in range(0, len(tickers), YAHOO_CHUNK):
-        chunk = tickers[i : i + YAHOO_CHUNK]
-        try:
-            raw = yf.download(chunk, period=period, auto_adjust=True, progress=False, threads=True)
-            if raw.empty:
-                continue
-
-            if isinstance(raw.columns, pd.MultiIndex):
-                # Multiple tickers → MultiIndex columns (field, ticker)
-                close_key = "Close" if "Close" in raw.columns.get_level_values(0) else "Adj Close"
-                close = raw[close_key]
-                for t in chunk:
-                    if t in close.columns:
-                        s = close[t].dropna()
-                        if len(s) >= 20:
-                            df = s.to_frame("close")
-                            df.index = pd.to_datetime(df.index).tz_localize(None)
-                            results[t] = df
-            else:
-                # Single ticker in chunk
-                t = chunk[0]
-                col = "Close" if "Close" in raw.columns else "Adj Close"
-                s = raw[col].dropna()
-                if len(s) >= 20:
-                    df = s.to_frame("close")
-                    df.index = pd.to_datetime(df.index).tz_localize(None)
-                    results[t] = df
-
-        except Exception:
-            pass
-
-        if i + YAHOO_CHUNK < len(tickers):
-            time.sleep(1)  # be gentle between chunks
-
-    return results
-
-
-# ── EODHD individual + Yahoo fallback ─────────────────────────────────────────
-
-def _fetch_all_eodhd(tickers: list[str], api_key: str, years: int) -> dict[str, pd.DataFrame]:
-    return {ticker: df for ticker, (df, _) in _fetch_all_eodhd_with_sources(tickers, api_key, years).items()}
+def _fetch_all_eodhd(
+    tickers: list[str],
+    api_key: str,
+    years: int,
+    progress: Optional[Callable[[dict], None]] = None,
+) -> dict[str, pd.DataFrame]:
+    return {
+        ticker: df
+        for ticker, (df, _) in _fetch_all_eodhd_with_sources(
+            tickers, api_key, years, progress=progress
+        ).items()
+    }
 
 
 def _fetch_all_eodhd_with_sources(
     tickers: list[str],
     api_key: str,
     years: int,
+    progress: Optional[Callable[[dict], None]] = None,
 ) -> dict[str, tuple[pd.DataFrame, str]]:
     if not api_key or api_key == "demo":
-        return {
-            ticker: (df, SOURCE_YAHOO)
-            for ticker, df in _fetch_all_yahoo(tickers, years).items()
-        }
+        raise ValueError("EODHD API key is required when source=eodhd.")
 
     results: dict[str, tuple[pd.DataFrame, str]] = {}
-    quota_exceeded = False
 
-    for ticker in tickers:
-        if quota_exceeded:
-            break
-
-        df, exceeded = _eodhd_one(ticker, api_key, years)
-        if exceeded:
-            quota_exceeded = True
-            break
+    total = len(tickers)
+    for index, ticker in enumerate(tickers, start=1):
+        df, status, attempts = _eodhd_one_with_retries(ticker, api_key, years)
         if df is not None:
             results[ticker] = (df, SOURCE_EODHD)
+            if progress:
+                progress({
+                    "index": index,
+                    "total": total,
+                    "ticker": ticker,
+                    "status": EODHD_OK,
+                    "attempts": attempts,
+                    "rows": len(df),
+                })
+            continue
 
-    # Remaining tickers (quota hit or not fetched) → Yahoo batch
-    remaining = [t for t in tickers if t not in results]
-    if remaining:
-        yahoo_results = _fetch_all_yahoo(remaining, years)
-        results.update({
-            ticker: (df, SOURCE_YAHOO)
-            for ticker, df in yahoo_results.items()
-        })
+        if progress:
+            progress({
+                "index": index,
+                "total": total,
+                "ticker": ticker,
+                "status": status,
+                "attempts": attempts,
+                "rows": 0,
+            })
+
+        if status in {EODHD_AUTH_ERROR, EODHD_QUOTA_EXCEEDED}:
+            break
 
     return results
 
 
-def _eodhd_one(ticker: str, api_key: str, years: int) -> tuple[Optional[pd.DataFrame], bool]:
-    """Returns (df_or_None, quota_exceeded)."""
+def _eodhd_one_with_retries(
+    ticker: str,
+    api_key: str,
+    years: int,
+    max_attempts: int = EODHD_MAX_ATTEMPTS,
+) -> tuple[Optional[pd.DataFrame], str, int]:
+    """Returns (df_or_None, final_status, attempts_used)."""
+    last_status = EODHD_RETRYABLE_FAILURE
+    for attempt in range(1, max_attempts + 1):
+        result = _eodhd_one_attempt(ticker, api_key, years)
+        last_status = result.status
+
+        if result.status == EODHD_OK:
+            return result.df, EODHD_OK, attempt
+
+        if result.status in {EODHD_AUTH_ERROR, EODHD_QUOTA_EXCEEDED, EODHD_NO_DATA}:
+            return None, result.status, attempt
+
+        if attempt < max_attempts:
+            time.sleep(EODHD_RETRY_SLEEP * attempt)
+
+    return None, last_status, max_attempts
+
+
+def _eodhd_one_attempt(ticker: str, api_key: str, years: int) -> EodhdAttempt:
+    """One EODHD request. Retry decisions are handled by _eodhd_one_with_retries."""
     from_date = (date.today() - timedelta(days=years * 365 + 30)).isoformat()
     url = (
         f"https://eodhd.com/api/eod/{ticker}"
@@ -172,38 +177,34 @@ def _eodhd_one(ticker: str, api_key: str, years: int) -> tuple[Optional[pd.DataF
     )
     try:
         resp = requests.get(url, timeout=15)
+        if resp.status_code in {401, 403}:
+            return EodhdAttempt(None, EODHD_AUTH_ERROR, f"auth failed ({resp.status_code})")
         if resp.status_code == 402:
-            return None, True  # quota exceeded → switch to Yahoo
+            return EodhdAttempt(None, EODHD_QUOTA_EXCEEDED, "quota exceeded")
+        if resp.status_code == 404:
+            return EodhdAttempt(None, EODHD_NO_DATA, "symbol not found")
+        if resp.status_code == 429 or resp.status_code >= 500:
+            return EodhdAttempt(None, EODHD_RETRYABLE_FAILURE, f"http {resp.status_code}")
         if resp.status_code != 200:
-            return None, False
+            return EodhdAttempt(None, EODHD_NO_DATA, f"http {resp.status_code}")
+
         data = resp.json()
         if not data or not isinstance(data, list):
-            return None, False
+            return EodhdAttempt(None, EODHD_NO_DATA, "empty response")
         df = pd.DataFrame(data)
+        if "date" not in df.columns:
+            return EodhdAttempt(None, EODHD_NO_DATA, "missing date column")
         df["date"] = pd.to_datetime(df["date"])
         df = df.set_index("date").sort_index()
         price_col = "adjusted_close" if "adjusted_close" in df.columns else "close"
+        if price_col not in df.columns:
+            return EodhdAttempt(None, EODHD_NO_DATA, "missing price column")
         df = df[[price_col]].rename(columns={price_col: "close"})
-        return df.dropna(), False
-    except Exception:
-        return None, False
-
-
-# ── Mock ──────────────────────────────────────────────────────────────────────
-
-def _mock(ticker: str, n_days: int = 504) -> pd.DataFrame:
-    seed = int(hashlib.md5(ticker.encode()).hexdigest()[:8], 16) % (2**31)
-    rng = np.random.default_rng(seed)
-    start_price = 80 + (seed % 120)
-    drift = 0.00035
-    vol = 0.010 + (seed % 7) * 0.0015
-    t = np.arange(n_days)
-    cycle = 0.12 * np.sin(2 * math.pi * t / 252 + seed % 6)
-    noise = rng.normal(drift, vol, n_days).cumsum()
-    prices = start_price * np.exp(noise + cycle * 0.05)
-    dates = pd.date_range(
-        end=pd.Timestamp.today().normalize(),
-        periods=n_days,
-        freq="B",
-    )
-    return pd.DataFrame({"close": prices}, index=dates)
+        df = df.dropna()
+        if df.empty:
+            return EodhdAttempt(None, EODHD_NO_DATA, "no usable prices")
+        return EodhdAttempt(df, EODHD_OK)
+    except requests.RequestException as exc:
+        return EodhdAttempt(None, EODHD_RETRYABLE_FAILURE, str(exc))
+    except ValueError as exc:
+        return EodhdAttempt(None, EODHD_NO_DATA, str(exc))

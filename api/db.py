@@ -16,8 +16,8 @@ DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).parent.parent / "data" /
 CACHE_TTL = 12 * 3600  # 12 h
 
 DEFAULT_SETTINGS: dict[str, str] = {
-    "data_source":   "mock",
-    "eodhd_api_key": "demo",
+    "data_source":   "eodhd",
+    "eodhd_api_key": "",
     "capital":       "10000",
     "top_n":         "5",
     "history_years": "2",
